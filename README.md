@@ -33,5 +33,3 @@ It's a lightweight, real-time solution for health tracking – ideal for basic h
 
 ---
 
-## 🗂️ Project Folder Structure
-
