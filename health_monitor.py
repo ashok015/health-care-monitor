@@ -1,15 +1,13 @@
 # ============================================
-# Health Monitor App (Final Clean Version)
+# Health Monitor App (Final Polished Version)
 # ============================================
 
 import streamlit as st
 import smtplib
 from email.message import EmailMessage
-from datetime import datetime
-import os
 
 # --------------------------------------------
-# Load email credentials from secrets.toml
+# Configuration: Read from Streamlit secrets
 # --------------------------------------------
 EMAIL_ADDRESS = st.secrets["credentials"]["email"]
 EMAIL_PASSWORD = st.secrets["credentials"]["password"]
@@ -17,22 +15,37 @@ EMAIL_PASSWORD = st.secrets["credentials"]["password"]
 # --------------------------------------------
 # Email alert function
 # --------------------------------------------
-def send_email_alert(vitals, receiver_email):
+def send_email_alert(vitals, receiver_email, health_status):
     try:
         msg = EmailMessage()
-        msg['Subject'] = 'Critical Health Alert'
+        msg['Subject'] = 'Health Report Summary'
         msg['From'] = EMAIL_ADDRESS
         msg['To'] = receiver_email
 
-        content = f"""
-        A critical health condition has been detected:
-
-        Heart Rate: {vitals['Heart Rate']} bpm
-        Blood Pressure: {vitals['BP Systolic']}/{vitals['BP Diastolic']}
-        Temperature: {vitals['Temperature']}°C
-        Glucose Level: {vitals['Glucose']} mg/dL
-        SpO2: {vitals['SpO2']}%
+        table = f"""
+        | Vital Sign       | Value       |
+        |------------------|-------------|
+        | Heart Rate       | {vitals['Heart Rate']} bpm |
+        | BP Systolic      | {vitals['BP Systolic']} mmHg |
+        | BP Diastolic     | {vitals['BP Diastolic']} mmHg |
+        | Temperature      | {vitals['Temperature']} °C |
+        | Glucose Level    | {vitals['Glucose']} mg/dL |
+        | SpO2             | {vitals['SpO2']}% |
         """
+
+        content = f"""
+        Hello,
+
+        This is your latest health report:
+
+        Health Status: {health_status}
+
+        {table}
+
+        Thank you,
+        Health Monitor System
+        """
+
         msg.set_content(content)
 
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
@@ -41,7 +54,7 @@ def send_email_alert(vitals, receiver_email):
 
         return True
     except Exception as e:
-        st.warning("Email error: " + str(e))
+        st.warning("Could not send email: " + str(e))
         return False
 
 # --------------------------------------------
@@ -51,13 +64,13 @@ def evaluate_health(vitals):
     issues = 0
     if vitals['Heart Rate'] < 60 or vitals['Heart Rate'] > 100:
         issues += 1
-    if vitals['BP Systolic'] > 140 or vitals['BP Diastolic'] > 90:
+    if vitals['BP Systolic'] > 130 or vitals['BP Diastolic'] > 85:
         issues += 1
-    if vitals['Temperature'] > 38.0:
+    if vitals['Temperature'] > 38 or vitals['Temperature'] < 36:
         issues += 1
-    if vitals['Glucose'] > 180:
+    if vitals['Glucose'] > 140:
         issues += 1
-    if vitals['SpO2'] < 95:
+    if vitals['SpO2'] < 94:
         issues += 1
 
     if issues == 0:
@@ -89,75 +102,80 @@ if 'vitals' not in st.session_state:
         "Heart Rate": 75,
         "BP Systolic": 120,
         "BP Diastolic": 80,
-        "Temperature": 37.0,
+        "Temperature": 37,
         "Glucose": 100,
-        "SpO2": 97
+        "SpO2": 98
     }
 
 # --------------------------------------------
 # PAGE 1 – USER INFO
 # --------------------------------------------
-def page_1():
-    st.title("Welcome to Health Monitor")
-    st.write("Please enter your details to proceed.")
+if st.session_state.page == 1:
+    st.title("Welcome to the Health Monitor App")
+    st.write("Please provide your information to begin.")
 
-    name = st.text_input("Full Name")
-    email = st.text_input("Your Email Address")
+    st.session_state.user_name = st.text_input("Full Name")
+    st.session_state.user_email = st.text_input("Your Email Address")
 
     if st.button("Next"):
-        if name and email:
-            st.session_state.user_name = name
-            st.session_state.user_email = email
+        if st.session_state.user_email and st.session_state.user_name:
             st.session_state.page = 2
         else:
-            st.warning("Please fill in all fields.")
+            st.warning("Both fields are required to proceed.")
 
 # --------------------------------------------
-# PAGE 2 – MEDICAL ENTRY
+# PAGE 2 – VITAL FORM
 # --------------------------------------------
-def page_2():
-    st.title("Enter Medical Report")
+elif st.session_state.page == 2:
+    st.title("Medical Report Entry")
+    st.write("Please input your current vital signs.")
+
     vitals = st.session_state.vitals
 
-    vitals['Heart Rate'] = st.number_input("Heart Rate (bpm)", min_value=30, max_value=200, value=vitals['Heart Rate'])
-    vitals['BP Systolic'] = st.number_input("Systolic BP", min_value=80, max_value=200, value=vitals['BP Systolic'])
-    vitals['BP Diastolic'] = st.number_input("Diastolic BP", min_value=50, max_value=130, value=vitals['BP Diastolic'])
-    vitals['Temperature'] = st.number_input("Temperature (°C)", min_value=34.0, max_value=42.0, value=vitals['Temperature'])
-    vitals['Glucose'] = st.number_input("Glucose Level (mg/dL)", min_value=50, max_value=300, value=vitals['Glucose'])
-    vitals['SpO2'] = st.number_input("SpO2 (%)", min_value=80, max_value=100, value=vitals['SpO2'])
+    vitals['Heart Rate'] = int(st.number_input("Heart Rate (bpm)", min_value=30, max_value=200, value=vitals['Heart Rate']))
+    vitals['BP Systolic'] = int(st.number_input("Systolic Blood Pressure", min_value=80, max_value=200, value=vitals['BP Systolic']))
+    vitals['BP Diastolic'] = int(st.number_input("Diastolic Blood Pressure", min_value=50, max_value=130, value=vitals['BP Diastolic']))
+    vitals['Temperature'] = int(st.number_input("Body Temperature (°C)", min_value=34, max_value=42, value=vitals['Temperature']))
+    vitals['Glucose'] = int(st.number_input("Blood Glucose (mg/dL)", min_value=50, max_value=300, value=vitals['Glucose']))
+    vitals['SpO2'] = int(st.number_input("Oxygen Saturation (SpO2 %)", min_value=80, max_value=100, value=vitals['SpO2']))
 
     if st.button("Generate Report"):
         st.session_state.page = 3
 
 # --------------------------------------------
-# PAGE 3 – SUMMARY
+# PAGE 3 – REPORT
 # --------------------------------------------
-def page_3():
-    st.title("Health Report")
+elif st.session_state.page == 3:
+    st.title("Your Health Summary")
+
     vitals = st.session_state.vitals
     status = evaluate_health(vitals)
 
     st.subheader(f"Patient: {st.session_state.user_name}")
-    st.write("### Vital Signs Summary")
-    st.table(vitals)
-    st.info(f"Health Status: {status}")
+    st.write("### Vital Signs")
+    st.table({
+        "Vital": ["Heart Rate", "BP Systolic", "BP Diastolic", "Temperature", "Glucose", "SpO2"],
+        "Value": [
+            f"{vitals['Heart Rate']} bpm",
+            f"{vitals['BP Systolic']} mmHg",
+            f"{vitals['BP Diastolic']} mmHg",
+            f"{vitals['Temperature']} °C",
+            f"{vitals['Glucose']} mg/dL",
+            f"{vitals['SpO2']}%"
+        ]
+    })
 
-    if status == "Critical":
-        success = send_email_alert(vitals, st.session_state.user_email)
-        if success:
-            st.success("Alert email sent to user.")
-        else:
-            st.error("Failed to send alert email.")
+    if status == "Normal":
+        st.success("Your health status is NORMAL. Keep it up!")
+    elif status == "Warning":
+        st.warning("Some signs are outside the normal range. Please monitor closely.")
+    else:
+        st.error("CRITICAL condition detected. Seek medical attention immediately.")
+
+    if send_email_alert(vitals, st.session_state.user_email, status):
+        st.info("Your full health report has been emailed to you.")
+    else:
+        st.warning("Failed to send health report via email.")
 
     if st.button("Start Over"):
         st.session_state.page = 1
-
-# --------------------------------------------
-# Render Pages
-# --------------------------------------------
-if st.session_state.page == 1:
-    page_1()
-elif st.session_state.page == 2:
-    page_2()
-elif st.session_state.page == 3:
-    page_3()
