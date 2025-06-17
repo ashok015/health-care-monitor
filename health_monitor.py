@@ -57,10 +57,23 @@ def evaluate_status(vitals):
 # SEND EMAIL NOTIFICATION IF STATUS IS CRITICAL
 # -----------------------------
 def send_email(vitals):
-    msg = EmailMessage()
-    msg['Subject'] = 'Critical Health Alert - Immediate Attention Required'
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = ALERT_RECEIVER
+    message = f"""Subject: 🚨 Critical Health Alert!
+
+    One or more vital signs are critical:
+    Heart Rate: {vitals['Heart Rate']}
+    BP Systolic: {vitals['BP Systolic']}
+    BP Diastolic: {vitals['BP Diastolic']}
+    Temperature: {vitals['Temperature']}
+    Glucose: {vitals['Glucose']}
+    SpO2: {vitals['SpO2']}
+
+    Please take immediate action.
+    """
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_ADDRESS, RECEIVER_EMAIL, message)
+
 
     content = f"""
     A critical health condition has been detected.
