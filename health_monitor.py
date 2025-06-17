@@ -1,18 +1,13 @@
 import streamlit as st
 import pandas as pd
-import random
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
 
-# ---------------------------
-# Streamlit Page Setup
-# ---------------------------
+# Page config
 st.set_page_config(page_title="Health Monitor", layout="wide")
 
-# ---------------------------
-# Session State Initialization
-# ---------------------------
+# Session state setup
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'user_email' not in st.session_state:
@@ -22,17 +17,13 @@ if 'user_name' not in st.session_state:
 if 'log' not in st.session_state:
     st.session_state.log = []
 
-# ---------------------------
-# Login Form
-# ---------------------------
+# Login form
 if not st.session_state.logged_in:
     st.title("Login to Health Monitoring System")
-
     with st.form("login_form"):
         user_email = st.text_input("Enter Your Email")
         user_name = st.text_input("Enter Your Name")
         login_submit = st.form_submit_button("Start Monitoring")
-
         if login_submit:
             if user_email and user_name:
                 st.session_state.user_email = user_email
@@ -40,24 +31,9 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.experimental_rerun()
             else:
-                st.warning("Please fill in both fields to continue.")
+                st.warning("Please fill in both fields.")
 
-# ---------------------------
-# Vitals Generator Function
-# ---------------------------
-def generate_vitals():
-    return {
-        "Heart Rate": random.randint(55, 135),
-        "BP Systolic": random.randint(95, 175),
-        "BP Diastolic": random.randint(65, 105),
-        "Temperature": round(random.uniform(36.2, 39.8), 1),
-        "Glucose": random.randint(80, 230),
-        "SpO2": random.randint(88, 100)
-    }
-
-# ---------------------------
-# Health Status Evaluation
-# ---------------------------
+# Health condition checker
 def evaluate_status(v):
     issues = 0
     if v['Heart Rate'] < 60 or v['Heart Rate'] > 120:
@@ -78,9 +54,7 @@ def evaluate_status(v):
     else:
         return "Critical"
 
-# ---------------------------
-# Email Alert Sender
-# ---------------------------
+# Email alert sender
 def send_email_alert(vitals, receiver_email):
     from secrets import EMAIL_ADDRESS, EMAIL_PASSWORD
 
@@ -112,45 +86,56 @@ def send_email_alert(vitals, receiver_email):
             server.send_message(msg)
         return True
     except Exception as e:
-        st.error(f"Failed to send email: {e}")
+        st.error(f"Could not send alert email: {e}")
         return False
 
-# ---------------------------
-# Monitoring Dashboard
-# ---------------------------
+# Main app after login
 if st.session_state.logged_in:
     st.title(f"Welcome, {st.session_state.user_name}")
-    st.write("Monitor your vital signs and get alerts for critical conditions.")
+    st.write("Please fill in your latest medical report.")
 
-    if st.button("Generate Vitals"):
-        vitals = generate_vitals()
-        status = evaluate_status(vitals)
-        time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with st.form("vitals_form"):
+        heart_rate = st.number_input("Heart Rate (bpm)", min_value=30, max_value=200)
+        bp_sys = st.number_input("BP Systolic", min_value=70, max_value=200)
+        bp_dia = st.number_input("BP Diastolic", min_value=40, max_value=120)
+        temp = st.number_input("Body Temperature (°C)", min_value=34.0, max_value=43.0, format="%.1f")
+        glucose = st.number_input("Glucose (mg/dL)", min_value=40, max_value=300)
+        spo2 = st.number_input("SpO2 (%)", min_value=60, max_value=100)
 
-        log_entry = {
-            "Timestamp": time,
-            **vitals,
-            "Status": status
-        }
-        st.session_state.log.append(log_entry)
+        submit_vitals = st.form_submit_button("Submit")
 
-        st.subheader(f"Current Status: {status}")
-        st.dataframe(pd.DataFrame([log_entry]))
+        if submit_vitals:
+            vitals = {
+                "Heart Rate": heart_rate,
+                "BP Systolic": bp_sys,
+                "BP Diastolic": bp_dia,
+                "Temperature": temp,
+                "Glucose": glucose,
+                "SpO2": spo2
+            }
 
-        if status == "Critical":
-            email_sent = send_email_alert(vitals, st.session_state.user_email)
-            if email_sent:
-                st.success("Email alert sent successfully.")
-            else:
-                st.error("Failed to send alert email.")
+            status = evaluate_status(vitals)
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            entry = {
+                "Timestamp": timestamp,
+                **vitals,
+                "Status": status
+            }
+
+            st.session_state.log.append(entry)
+
+            st.subheader(f"Current Status: {status}")
+            st.dataframe(pd.DataFrame([entry]))
+
+            if status == "Critical":
+                if send_email_alert(vitals, st.session_state.user_email):
+                    st.success("Critical alert sent to your email.")
+                else:
+                    st.error("Failed to send email.")
 
     if st.session_state.log:
-        st.subheader("Monitoring History")
-        history_df = pd.DataFrame(st.session_state.log)
-        st.dataframe(history_df)
-
-        st.download_button(
-            label="Download Log as CSV",
-            data=history_df.to_csv(index=False).encode(),
-            file_name="health_log.csv"
-        )
+        st.subheader("Your Monitoring History")
+        df = pd.DataFrame(st.session_state.log)
+        st.dataframe(df)
+        st.download_button("Download CSV Report", data=df.to_csv(index=False).encode(), file_name="health_report.csv")
