@@ -6,7 +6,7 @@ from email.message import EmailMessage
 from datetime import datetime
 
 # -------------------------
-# Function to generate vitals
+# Generate Random Vitals
 # -------------------------
 def generate_sample_data():
     return {
@@ -42,9 +42,9 @@ def evaluate_status(vitals):
         return "Critical"
 
 # -------------------------
-# Send email alert
+# Send Email Alert
 # -------------------------
-def send_email_alert(vitals, receiver_email, user_name):
+def send_email_alert(vitals, receiver_email, user_name, medical_info):
     EMAIL_ADDRESS = st.secrets["credentials"]["EMAIL_ADDRESS"]
     EMAIL_PASSWORD = st.secrets["credentials"]["EMAIL_PASSWORD"]
 
@@ -54,10 +54,11 @@ def send_email_alert(vitals, receiver_email, user_name):
     msg['To'] = receiver_email
 
     content = f"""
-    A critical health condition has been detected.
+    Critical health alert triggered.
 
-    Patient Name: {user_name}
+    Name: {user_name}
     Email: {receiver_email}
+    Medical History: {medical_info}
 
     Vitals:
     - Heart Rate: {vitals['Heart Rate']} bpm
@@ -66,7 +67,7 @@ def send_email_alert(vitals, receiver_email, user_name):
     - Glucose: {vitals['Glucose']} mg/dL
     - SpO2: {vitals['SpO2']} %
 
-    Please consult a healthcare provider.
+    Please consult a doctor immediately.
     """
     msg.set_content(content)
 
@@ -76,33 +77,43 @@ def send_email_alert(vitals, receiver_email, user_name):
             server.send_message(msg)
         return True
     except Exception as e:
-        st.error(f"Email failed: {e}")
+        st.error(f"Failed to send email: {e}")
         return False
 
 # -------------------------
-# Streamlit UI
+# Streamlit App
 # -------------------------
 st.set_page_config(page_title="Health Monitor", layout="wide")
-st.title("Health Monitoring System")
+st.title("Health Monitor System")
 
-# Step 1: User inputs
-if 'user_name' not in st.session_state:
+# -------------------------
+# Step 1: Get User Info
+# -------------------------
+if 'user_registered' not in st.session_state:
     with st.form("user_form"):
+        st.subheader("User Details")
         name = st.text_input("Full Name")
         email = st.text_input("Email Address (to receive alerts)")
-        submitted = st.form_submit_button("Submit & Start")
+        medical = st.text_area("Medical History (e.g., Diabetes, Hypertension, etc.)")
+        submit = st.form_submit_button("Save & Start Monitoring")
 
-        if submitted and name and email:
+        if submit and name and email:
             st.session_state.user_name = name
             st.session_state.user_email = email
-            st.success("Details saved. You can now monitor vitals.")
+            st.session_state.user_medical = medical
+            st.session_state.user_registered = True
+            st.success("Details saved! You can now start monitoring.")
+        elif submit:
+            st.warning("Please fill all fields.")
 
-# Step 2: Generate data and monitor
-if 'user_name' in st.session_state and 'user_email' in st.session_state:
+# -------------------------
+# Step 2: Start Monitoring
+# -------------------------
+if st.session_state.get('user_registered'):
     if 'record_log' not in st.session_state:
         st.session_state['record_log'] = []
 
-    if st.button("Generate Health Reading"):
+    if st.button("Check Health Now"):
         vitals = generate_sample_data()
         status = evaluate_status(vitals)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -114,17 +125,19 @@ if 'user_name' in st.session_state and 'user_email' in st.session_state:
         }
         st.session_state['record_log'].append(record)
 
-        st.subheader(f"Status: {status}")
+        st.subheader(f"Health Status: {status}")
         st.dataframe(pd.DataFrame([record]))
 
         if status == "Critical":
-            if send_email_alert(vitals, st.session_state.user_email, st.session_state.user_name):
-                st.error("Critical alert email sent to user.")
+            sent = send_email_alert(vitals, st.session_state.user_email,
+                                    st.session_state.user_name, st.session_state.user_medical)
+            if sent:
+                st.error("Alert email sent to the user.")
             else:
-                st.warning("Failed to send email.")
+                st.warning("Email sending failed.")
 
     if st.session_state['record_log']:
-        st.subheader("Monitoring Log")
+        st.subheader("Monitoring History")
         df = pd.DataFrame(st.session_state['record_log'])
         st.dataframe(df)
-        st.download_button("Download Log", df.to_csv(index=False), file_name="health_log.csv")
+        st.download_button("Download Report", df.to_csv(index=False), "health_log.csv")
