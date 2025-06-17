@@ -34,16 +34,16 @@ def send_email_alert(vitals, receiver_email, health_status):
         """
 
         content = f"""
-        Hello,
+Hello,
 
-        This is your latest health report:
+This is your latest health report from the Health Monitor App.
 
-        Health Status: {health_status}
+Health Status: {health_status}
 
-        {table}
+{table}
 
-        Thank you,
-        Health Monitor System
+Thank you,
+Health Monitor System
         """
 
         msg.set_content(content)
