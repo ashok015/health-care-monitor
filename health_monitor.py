@@ -61,12 +61,10 @@ def send_email(vitals):
     import smtplib
     import streamlit as st
 
-    # Load credentials
     sender_email = st.secrets["credentials"]["email"]
     app_password = st.secrets["credentials"]["password"]
     receiver_email = st.secrets["credentials"]["receiver"]
 
-    # Prepare the email message
     msg = EmailMessage()
     msg['Subject'] = 'Health Alert: Critical Vitals Detected'
     msg['From'] = sender_email
@@ -91,6 +89,13 @@ def send_email(vitals):
     """)
 
     try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender_email, app_password)
+            server.send_message(msg)
+            st.success("Email alert sent successfully.")
+    except Exception as e:
+        st.error(f"Could not send email: {e}")
+
 
 
 # -----------------------------
