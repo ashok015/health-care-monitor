@@ -21,13 +21,14 @@ ALERT_RECEIVER = "receiver_email@gmail.com"  # Recipient's email address
 # -----------------------------
 def generate_sample_data():
     return {
-        "Heart Rate": random.randint(55, 135),
-        "BP Systolic": random.randint(95, 175),
-        "BP Diastolic": random.randint(65, 105),
-        "Temperature": round(random.uniform(36.2, 39.8), 1),
-        "Glucose": random.randint(80, 230),
-        "SpO2": random.randint(88, 100)
+        "Heart Rate": 150,  # Critical
+        "BP Systolic": 180,  # Critical
+        "BP Diastolic": 100,
+        "Temperature": 39.5,
+        "Glucose": 250,
+        "SpO2": 88  # Critical
     }
+
 
 # -----------------------------
 # EVALUATE HEALTH STATUS BASED ON DATA
