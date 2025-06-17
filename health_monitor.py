@@ -1,27 +1,52 @@
+# ============================================
+# 🩺 HEALTH MONITOR APP (HUMAN-WRITTEN MULTI-PAGE VERSION)
+# ============================================
+
 import streamlit as st
-import pandas as pd
-import random
 import smtplib
 from email.message import EmailMessage
 from datetime import datetime
 
-# -------------------------
-# Generate Random Vitals
-# -------------------------
-def generate_sample_data():
-    return {
-        "Heart Rate": random.randint(55, 135),
-        "BP Systolic": random.randint(95, 175),
-        "BP Diastolic": random.randint(65, 105),
-        "Temperature": round(random.uniform(36.2, 39.8), 1),
-        "Glucose": random.randint(80, 230),
-        "SpO2": random.randint(88, 100)
-    }
+# --------------------------------------------
+# Configuration (can be loaded from secrets.toml in deployment)
+# --------------------------------------------
+EMAIL_ADDRESS = "your_email@gmail.com"
+EMAIL_PASSWORD = "your_app_password"
 
-# -------------------------
-# Evaluate health status
-# -------------------------
-def evaluate_status(vitals):
+# --------------------------------------------
+# Email alert function
+# --------------------------------------------
+def send_email_alert(vitals, receiver_email):
+    try:
+        msg = EmailMessage()
+        msg['Subject'] = 'Critical Health Alert'
+        msg['From'] = EMAIL_ADDRESS
+        msg['To'] = receiver_email
+
+        content = f"""
+        A critical health condition has been detected:
+
+        Heart Rate: {vitals['Heart Rate']} bpm
+        Blood Pressure: {vitals['BP Systolic']}/{vitals['BP Diastolic']}
+        Temperature: {vitals['Temperature']}°C
+        Glucose Level: {vitals['Glucose']} mg/dL
+        SpO2: {vitals['SpO2']}%
+        """
+        msg.set_content(content)
+
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.send_message(msg)
+
+        return True
+    except Exception as e:
+        st.warning("⚠️ Could not send email: " + str(e))
+        return False
+
+# --------------------------------------------
+# Health evaluation function
+# --------------------------------------------
+def evaluate_health(vitals):
     issues = 0
     if vitals['Heart Rate'] < 60 or vitals['Heart Rate'] > 120:
         issues += 1
@@ -41,103 +66,87 @@ def evaluate_status(vitals):
     else:
         return "Critical"
 
-# -------------------------
-# Send Email Alert
-# -------------------------
-def send_email_alert(vitals, receiver_email, user_name, medical_info):
-    EMAIL_ADDRESS = st.secrets["credentials"]["EMAIL_ADDRESS"]
-    EMAIL_PASSWORD = st.secrets["credentials"]["EMAIL_PASSWORD"]
+# --------------------------------------------
+# Streamlit App Configuration
+# --------------------------------------------
+st.set_page_config(page_title="Health Monitor App", layout="centered")
 
-    msg = EmailMessage()
-    msg['Subject'] = "Critical Health Alert"
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = receiver_email
+# --------------------------------------------
+# Session State Initialization
+# --------------------------------------------
+if 'page' not in st.session_state:
+    st.session_state.page = 1
 
-    content = f"""
-    Critical health alert triggered.
+if 'user_name' not in st.session_state:
+    st.session_state.user_name = ""
 
-    Name: {user_name}
-    Email: {receiver_email}
-    Medical History: {medical_info}
+if 'user_email' not in st.session_state:
+    st.session_state.user_email = ""
 
-    Vitals:
-    - Heart Rate: {vitals['Heart Rate']} bpm
-    - Blood Pressure: {vitals['BP Systolic']}/{vitals['BP Diastolic']}
-    - Temperature: {vitals['Temperature']} °C
-    - Glucose: {vitals['Glucose']} mg/dL
-    - SpO2: {vitals['SpO2']} %
+if 'vitals' not in st.session_state:
+    st.session_state.vitals = {
+        "Heart Rate": 75,
+        "BP Systolic": 120,
+        "BP Diastolic": 80,
+        "Temperature": 37.0,
+        "Glucose": 100,
+        "SpO2": 97
+    }
 
-    Please consult a doctor immediately.
-    """
-    msg.set_content(content)
+# --------------------------------------------
+# PAGE 1 – USER INFO
+# --------------------------------------------
+if st.session_state.page == 1:
+    st.title("Health Monitor - Welcome")
+    st.write("Please enter your details to begin.")
 
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        st.error(f"Failed to send email: {e}")
-        return False
+    st.session_state.user_name = st.text_input("Your Name")
+    st.session_state.user_email = st.text_input("Alert Email")
 
-# -------------------------
-# Streamlit App
-# -------------------------
-st.set_page_config(page_title="Health Monitor", layout="wide")
-st.title("Health Monitor System")
+    if st.button("Next"):
+        if st.session_state.user_email and st.session_state.user_name:
+            st.session_state.page = 2
+        else:
+            st.warning("Please fill out both fields to continue.")
 
-# -------------------------
-# Step 1: Get User Info
-# -------------------------
-if 'user_registered' not in st.session_state:
-    with st.form("user_form"):
-        st.subheader("User Details")
-        name = st.text_input("Full Name")
-        email = st.text_input("Email Address (to receive alerts)")
-        medical = st.text_area("Medical History (e.g., Diabetes, Hypertension, etc.)")
-        submit = st.form_submit_button("Save & Start Monitoring")
+# --------------------------------------------
+# PAGE 2 – VITAL FORM
+# --------------------------------------------
+elif st.session_state.page == 2:
+    st.title("Enter Medical Vitals")
+    st.write("Fill in your current health stats.")
 
-        if submit and name and email:
-            st.session_state.user_name = name
-            st.session_state.user_email = email
-            st.session_state.user_medical = medical
-            st.session_state.user_registered = True
-            st.success("Details saved! You can now start monitoring.")
-        elif submit:
-            st.warning("Please fill all fields.")
+    vitals = st.session_state.vitals
 
-# -------------------------
-# Step 2: Start Monitoring
-# -------------------------
-if st.session_state.get('user_registered'):
-    if 'record_log' not in st.session_state:
-        st.session_state['record_log'] = []
+    vitals['Heart Rate'] = st.number_input("Heart Rate (bpm)", min_value=30, max_value=200, value=vitals['Heart Rate'])
+    vitals['BP Systolic'] = st.number_input("Blood Pressure - Systolic", min_value=80, max_value=200, value=vitals['BP Systolic'])
+    vitals['BP Diastolic'] = st.number_input("Blood Pressure - Diastolic", min_value=50, max_value=130, value=vitals['BP Diastolic'])
+    vitals['Temperature'] = st.number_input("Temperature (°C)", min_value=34.0, max_value=42.0, value=vitals['Temperature'], step=0.1)
+    vitals['Glucose'] = st.number_input("Glucose Level (mg/dL)", min_value=50, max_value=300, value=vitals['Glucose'])
+    vitals['SpO2'] = st.number_input("SpO2 (%)", min_value=80, max_value=100, value=vitals['SpO2'])
 
-    if st.button("Check Health Now"):
-        vitals = generate_sample_data()
-        status = evaluate_status(vitals)
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if st.button("Generate Report"):
+        st.session_state.page = 3
 
-        record = {
-            "Timestamp": timestamp,
-            **vitals,
-            "Status": status
-        }
-        st.session_state['record_log'].append(record)
+# --------------------------------------------
+# PAGE 3 – REPORT
+# --------------------------------------------
+elif st.session_state.page == 3:
+    st.title("Health Report")
 
-        st.subheader(f"Health Status: {status}")
-        st.dataframe(pd.DataFrame([record]))
+    vitals = st.session_state.vitals
+    status = evaluate_health(vitals)
 
-        if status == "Critical":
-            sent = send_email_alert(vitals, st.session_state.user_email,
-                                    st.session_state.user_name, st.session_state.user_medical)
-            if sent:
-                st.error("Alert email sent to the user.")
-            else:
-                st.warning("Email sending failed.")
+    st.subheader(f"Patient: {st.session_state.user_name}")
+    st.write("### Vitals Summary")
+    st.write(vitals)
+    st.success(f"Status: {status}")
 
-    if st.session_state['record_log']:
-        st.subheader("Monitoring History")
-        df = pd.DataFrame(st.session_state['record_log'])
-        st.dataframe(df)
-        st.download_button("Download Report", df.to_csv(index=False), "health_log.csv")
+    if status == "Critical":
+        if send_email_alert(vitals, st.session_state.user_email):
+            st.error("Critical alert email has been sent!")
+        else:
+            st.warning("Email alert could not be delivered.")
+
+    if st.button("Restart"):
+        st.session_state.page = 1
