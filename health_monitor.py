@@ -57,32 +57,41 @@ def evaluate_status(vitals):
 # SEND EMAIL NOTIFICATION IF STATUS IS CRITICAL
 # -----------------------------
 def send_email(vitals):
+    from email.message import EmailMessage
     import smtplib
     import streamlit as st
 
-    EMAIL_ADDRESS = st.secrets["credentials"]["email"]
-    EMAIL_PASSWORD = st.secrets["credentials"]["password"]
-    RECEIVER_EMAIL = st.secrets["credentials"]["receiver"]
+    # Load credentials
+    sender_email = st.secrets["credentials"]["email"]
+    app_password = st.secrets["credentials"]["password"]
+    receiver_email = st.secrets["credentials"]["receiver"]
 
-    subject = "🚨 Critical Health Alert!"
-    body = (
-        f"Patient vitals are critical:\n"
-        f"- Heart Rate: {vitals['Heart Rate']} bpm\n"
-        f"- BP: {vitals['BP Systolic']}/{vitals['BP Diastolic']}\n"
-        f"- Temperature: {vitals['Temperature']}°C\n"
-        f"- Glucose: {vitals['Glucose']} mg/dL\n"
-        f"- SpO2: {vitals['SpO2']}%\n\n"
-        "Please take immediate action."
-    )
-    message = f"Subject: {subject}\n\n{body}"
+    # Prepare the email message
+    msg = EmailMessage()
+    msg['Subject'] = 'Health Alert: Critical Vitals Detected'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+
+    msg.set_content(f"""
+    Hello,
+
+    A patient has shown critical signs in their health monitoring report.
+
+    Vitals Report:
+    - Heart Rate     : {vitals['Heart Rate']} bpm
+    - Blood Pressure : {vitals['BP Systolic']}/{vitals['BP Diastolic']} mmHg
+    - Temperature    : {vitals['Temperature']} °C
+    - Glucose Level  : {vitals['Glucose']} mg/dL
+    - SpO2           : {vitals['SpO2']}%
+
+    Immediate attention is advised.
+
+    Regards,
+    Health Monitoring System
+    """)
 
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_ADDRESS, RECEIVER_EMAIL, message)
-    except Exception as e:
-        st.error(f"⚠️ Could not send email: {e}")
+
 
 # -----------------------------
 # STREAMLIT DASHBOARD UI
